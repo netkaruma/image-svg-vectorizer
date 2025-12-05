@@ -20,7 +20,7 @@ from color_image_vectorizer import vectorize_image
 result = vectorize_image(
     input_path="input.png",
     output_path="output.svg",
-    num_colors=8,
+    num_colors=200,
     preserve_transparency=True
 )
 
