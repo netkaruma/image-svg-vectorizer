@@ -83,7 +83,9 @@ ColorImageVectorizer(
     contour_tolerance: float = 1.5,
     min_contour_area: int = 10,
     preserve_transparency: bool = True,
-    use_acceleration: bool = True
+    use_acceleration: bool = True,
+    expand_contours: bool = True,
+    expansion_pixels: int = 1,
 )
 ```
 ### Parameters:
@@ -93,6 +95,8 @@ ColorImageVectorizer(
 3. min_contour_area (int): Minimum contour area (in pixels) to include in SVG. Smaller contours are discarded.
 4. preserve_transparency (bool): Whether to preserve alpha channel from PNG images.
 5. use_acceleration (bool): Use Numba JIT compiler for faster processing (requires numba package).
+6. expand_contours (bool): Extending lines to cover joints.
+7. expansion_pixels (int): The magnitude of the line expansion.
 
 ## Method: process_image()
 
