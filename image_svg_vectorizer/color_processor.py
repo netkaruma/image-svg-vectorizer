@@ -15,7 +15,9 @@ class ColorProcessor:
                  simplify_contours: bool = True,
                  contour_tolerance: float = 1.5,
                  min_contour_area: int = 10,
-                 preserve_transparency: bool = True):
+                 preserve_transparency: bool = True,
+                 expand_contours: bool = True,
+                 expansion_pixels: int = 1):
         """
         Initialize color processor.
         
@@ -29,6 +31,8 @@ class ColorProcessor:
         self.contour_tolerance = contour_tolerance
         self.min_contour_area = min_contour_area
         self.preserve_transparency = preserve_transparency
+        self.expand_contours = expand_contours
+        self.expansion_pixels = expansion_pixels
     
     def simplify_with_kmeans(self, 
                            image: np.ndarray, 
@@ -193,20 +197,85 @@ class ColorProcessor:
             return result[:, :, :3]  # Return only color
         
         return quantized
-    
-    def find_color_contours(self, 
-                          image: np.ndarray, 
-                          color_bgr: Tuple[int, int, int],
-                          alpha_channel: Optional[np.ndarray] = None,
-                          min_alpha: int = 1) -> Optional[ColorInfo]:
+    def expand_contours_method(self,
+                    color_info: ColorInfo,
+                    expansion_pixels: int = 1,) -> ColorInfo:
         """
-        Find contours for specific color considering transparency.
+        Расширить контуры, чтобы они немного перекрывались.
+        
+        Args:
+            color_info: Информация о цвете
+            expansion_pixels: Количество пикселей для расширения
+            
+        Returns:
+            Обновленный ColorInfo
+        """
+        if self.expansion_pixels <= 0:
+            return color_info
+        
+        # Создаем маску из текущих контуров
+        h, w = color_info.mask.shape[:2]
+        mask = np.zeros((h, w), dtype=np.uint8)
+        
+        # Рисуем все контуры на маске
+        cv2.drawContours(mask, color_info.external_contours, -1, 255, -1)
+        cv2.drawContours(mask, color_info.internal_contours, -1, 0, -1)
+        
+        # Расширяем маску
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, 
+                                        (2*self.expansion_pixels+1, 2*self.expansion_pixels+1))
+        expanded_mask = cv2.dilate(mask, kernel, iterations=1)
+        
+        # Находим новые контуры на расширенной маске
+        new_contours, new_hierarchy = cv2.findContours(
+            expanded_mask,
+            cv2.RETR_CCOMP,
+            cv2.CHAIN_APPROX_SIMPLE
+        )
+        
+        # Разделяем на внешние и внутренние контуры
+        external_contours = []
+        internal_contours = []
+        
+        if new_hierarchy is not None:
+            new_hierarchy = new_hierarchy[0]
+            for i, contour in enumerate(new_contours):
+                if cv2.contourArea(contour) < 5:
+                    continue
+                    
+                if new_hierarchy[i][3] == -1:  # External contour
+                    external_contours.append(contour)
+                else:  # Internal contour
+                    internal_contours.append(contour)
+        else:
+            external_contours = new_contours
+        
+        # Обновляем ColorInfo
+        color_info.contours = new_contours
+        color_info.external_contours = external_contours
+        color_info.internal_contours = internal_contours
+        color_info.mask = expanded_mask
+        
+        # Пересчитываем периметры
+        color_info.external_perimeters = [cv2.arcLength(c, True) for c in external_contours]
+        color_info.internal_perimeters = [cv2.arcLength(c, True) for c in internal_contours]
+        
+        return color_info
+    def find_color_contours(self, 
+                        image: np.ndarray, 
+                        color_bgr: Tuple[int, int, int],
+                        alpha_channel: Optional[np.ndarray] = None,
+                        min_alpha: int = 1) -> Optional[ColorInfo]:
+        """
+        Find contours for specific color considering transparency with optional expansion.
         
         Args:
             image: Simplified image
             color_bgr: Color in BGR format
             alpha_channel: Image alpha channel
             min_alpha: Minimum alpha value to consider
+            expand_contours: Whether to expand contours to prevent gaps
+            expansion_pixels: Pixels to expand (recommended: 1-2 pixels)
             
         Returns:
             ColorInfo object or None
@@ -224,6 +293,12 @@ class ColorProcessor:
         # Skip too small areas
         if np.sum(mask > 0) < self.min_contour_area:
             return None
+        
+        # Optional: dilate mask before finding contours to create overlap
+        if self.expand_contours and self.expansion_pixels > 0:
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, 
+                                            (2*self.expansion_pixels + 1, 2*self.expansion_pixels + 1))
+            mask = cv2.dilate(mask, kernel, iterations=1)
         
         # Find contours
         contours, hierarchy = cv2.findContours(
@@ -279,6 +354,11 @@ class ColorProcessor:
             mask=mask,
             transparent_areas=transparent_areas
         )
+        
+        # Apply additional expansion if needed (post-processing)
+        if self.expand_contours and self.expansion_pixels > 0:
+            # Apply the expand_contours_method for more precise control
+            color_info = self.expand_contours_method(color_info, self.expansion_pixels)
         
         return color_info
     
