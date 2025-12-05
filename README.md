@@ -21,7 +21,7 @@ result = vectorize_image(
     input_path="input.png",
     output_path="output.svg",
     num_colors=200,
-    preserve_transparency=True
+    min_contour_area=0.01
 )
 
 # Or use the class directly
