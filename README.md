@@ -1,6 +1,7 @@
 # Color Image Vectorizer
-
 ### A powerful Python tool for converting raster images (PNG, JPG, etc.) into scalable vector graphics (SVG) with optimized color simplification and transparency support.
+___ 
+<img width="1134" height="671" alt="image" src="https://github.com/user-attachments/assets/09b40db0-fcf0-4d75-9197-b4c684a4c1eb" />   
 
 ## Quick Start
 
@@ -112,8 +113,8 @@ process_image(
 1. image_path (str/Path): Path to input image or numpy array. Supports PNG, JPG, BMP, TIFF, WebP.
 2. num_colors (int): Target number of colors for simplification.
 3. method (str): Color simplification method:
-    1. 'kmeans': K-means clustering (more accurate, slower)
-    2. 'median': Median cut quantization (faster, good for images with clear color separation)
+    'kmeans': K-means clustering (more accurate, slower)
+    'median': Median cut quantization (faster, good for images with clear color separation)
 4. auto_colors (bool): Automatically determine optimal number of colors based on image complexity.
 5. max_colors (int): Maximum number of colors when auto_colors=True.
 
