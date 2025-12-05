@@ -281,18 +281,6 @@ pip install numba
 vectorizer = ColorImageVectorizer(use_acceleration=True)
 ```
 
-## Automatic Color Detection
-
-## Let the tool determine optimal color count:
-
-```python
-results = vectorizer.process_image(
-    "input.jpg",
-    auto_colors=True,
-    max_colors=12  # Maximum colors to use
-)
-```
-
 ## Custom Contour Processing
 
 ```python
