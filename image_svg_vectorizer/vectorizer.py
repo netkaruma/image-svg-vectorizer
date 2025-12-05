@@ -12,7 +12,7 @@ import warnings
 
 warnings.filterwarnings('ignore')
 
-from .utils import ProcessingResults, ColorInfo, auto_determine_colors, bgr_to_rgb, bgr_to_hex
+from .utils import ProcessingResults, ColorInfo, ColorMode, auto_determine_colors, bgr_to_rgb, bgr_to_hex, calculate_image_complexity
 from .color_processor import ColorProcessor
 from .svg_exporter import SVGExporter
 
@@ -32,7 +32,11 @@ class ColorImageVectorizer:
                  contour_tolerance: float = 1.5,
                  min_contour_area: int = 10,
                  preserve_transparency: bool = True,
-                 use_acceleration: bool = True):
+                 use_acceleration: bool = True,
+                 expand_contours: bool = True,
+                 expansion_pixels: int = 1,
+                 color_mode: ColorMode = ColorMode.AUTO,
+                 num_colors: Optional[int] = None):
         """
         Initialize the vectorizer with optional acceleration.
         
@@ -42,9 +46,23 @@ class ColorImageVectorizer:
             min_contour_area: Minimum contour area for processing
             preserve_transparency: Whether to preserve transparency (alpha channel)
             use_acceleration: Use CPU/GPU acceleration (Numba)
+            expand_contours: Whether to expand contours for better edge handling
+            expansion_pixels: Number of pixels to expand contours
+            color_mode: Color determination mode (AUTO or MANUAL)
+            num_colors: Manual number of colors (overrides auto mode)
         """
         self.preserve_transparency = preserve_transparency
         self.use_acceleration = use_acceleration
+        self.color_mode = color_mode
+        
+        # If num_colors is explicitly provided, switch to MANUAL mode
+        if num_colors is not None:
+            self.color_mode = ColorMode.MANUAL
+            self.num_colors = num_colors
+            print(f"✓ Manual color mode with {num_colors} colors")
+        else:
+            self.num_colors = None
+            print(f"✓ Auto color mode enabled")
         
         # Check if Numba is available for acceleration
         try:
@@ -62,10 +80,30 @@ class ColorImageVectorizer:
             simplify_contours=simplify_contours,
             contour_tolerance=contour_tolerance,
             min_contour_area=min_contour_area,
-            preserve_transparency=preserve_transparency
+            preserve_transparency=preserve_transparency,
+            expand_contours=expand_contours,
+            expansion_pixels=expansion_pixels,
         )
         self.svg_exporter = SVGExporter(self.color_processor)
+    
+    def set_color_mode(self, mode: ColorMode, num_colors: Optional[int] = None):
+        """
+        Set the color mode and optionally the number of colors.
         
+        Args:
+            mode: ColorMode.AUTO or ColorMode.MANUAL
+            num_colors: Required if mode is MANUAL
+        """
+        self.color_mode = mode
+        if mode == ColorMode.MANUAL:
+            if num_colors is None:
+                raise ValueError("num_colors must be provided for MANUAL mode")
+            self.num_colors = num_colors
+            print(f"Switched to MANUAL mode with {num_colors} colors")
+        else:
+            self.num_colors = None
+            print("Switched to AUTO mode")
+    
     def _kmeans_accelerated(self, 
                            pixels: np.ndarray, 
                            num_colors: int,
@@ -348,19 +386,19 @@ class ColorImageVectorizer:
     
     def process_image(self, 
                     image_path: Union[str, Path],
-                    num_colors: int = 8,
+                    num_colors: Optional[int] = None,
                     method: str = 'kmeans',
-                    auto_colors: bool = False,
-                    max_colors: int = 16) -> ProcessingResults:
+                    max_colors: int = 64,
+                    min_colors: int = 4) -> ProcessingResults:
         """
         Main method for processing an image with acceleration support.
         
         Args:
             image_path: Path to the image
-            num_colors: Number of colors for simplification
+            num_colors: Number of colors for simplification (overrides auto mode)
             method: Simplification method ('kmeans' or 'median')
-            auto_colors: Automatically determine optimal number of colors
-            max_colors: Maximum number of colors when auto_colors=True
+            max_colors: Maximum number of colors for auto mode
+            min_colors: Minimum number of colors for auto mode
             
         Returns:
             ProcessingResults object
@@ -376,6 +414,23 @@ class ColorImageVectorizer:
         else:
             # Assume it's already a numpy array
             image = image_path
+        
+        # Determine color mode and count
+        if num_colors is not None:
+            # Override with provided num_colors
+            color_mode = ColorMode.MANUAL
+            colors_to_use = num_colors
+            print(f"Using manual color count: {colors_to_use}")
+        elif self.color_mode == ColorMode.MANUAL and self.num_colors is not None:
+            # Use preset manual value
+            color_mode = ColorMode.MANUAL
+            colors_to_use = self.num_colors
+            print(f"Using preset manual color count: {colors_to_use}")
+        else:
+            # Auto mode
+            color_mode = ColorMode.AUTO
+            colors_to_use = auto_determine_colors(image, max_colors, min_colors)
+            print(f"Auto-determined color count: {colors_to_use}")
         
         # Check for alpha channel presence
         has_alpha = image.shape[2] == 4 if len(image.shape) > 2 else False
@@ -411,16 +466,11 @@ class ColorImageVectorizer:
                 color_image = image.copy()
             transparency_info = {'has_alpha': False}
         
-        # Automatic color count determination
-        if auto_colors:
-            num_colors = auto_determine_colors(color_image, max_colors)
-            print(f"Automatically determined {num_colors} colors")
-        
         # Simplify colors with acceleration
         if method == 'median':
-            simplified_image = self._median_cut_accelerated(color_image, num_colors)
+            simplified_image = self._median_cut_accelerated(color_image, colors_to_use)
         else:  # kmeans by default
-            simplified_image = self._simplify_with_kmeans_accelerated(color_image, num_colors)
+            simplified_image = self._simplify_with_kmeans_accelerated(color_image, colors_to_use)
         
         # Restore alpha channel if needed
         if has_alpha and self.preserve_transparency:
@@ -530,11 +580,15 @@ class ColorImageVectorizer:
             image_shape=image.shape,
             processing_time=processing_time,
             transparency_info=transparency_info if has_alpha else None,
-            simplified_image_with_alpha=simplified_image_with_alpha
+            simplified_image_with_alpha=simplified_image_with_alpha,
+            color_mode=color_mode,
+            num_colors_used=colors_to_use
         )
         
         # Print statistics
         print(f"Processing completed in {processing_time:.2f} sec")
+        print(f"Color mode: {color_mode.value}")
+        print(f"Colors used: {colors_to_use}")
         print(f"Unique colors: {len(unique_colors)}")
         print(f"Colors with contours: {len(color_info_dict)}")
         if has_alpha and self.preserve_transparency:
@@ -626,10 +680,18 @@ class ColorImageVectorizer:
         # Simplified image
         if results.simplified_image_with_alpha is not None and show_alpha:
             axes[0, 1].imshow(cv2.cvtColor(results.simplified_image_with_alpha, cv2.COLOR_BGRA2RGBA))
-            axes[0, 1].set_title(f'Simplified ({len(results.unique_colors)} colors with transparency)')
+            title = f'Simplified ({len(results.unique_colors)} colors with transparency)'
         else:
             axes[0, 1].imshow(cv2.cvtColor(results.simplified_image, cv2.COLOR_BGR2RGB))
-            axes[0, 1].set_title(f'Simplified ({len(results.unique_colors)} colors)')
+            title = f'Simplified ({len(results.unique_colors)} colors)'
+        
+        # Add color mode info to title
+        if results.color_mode == ColorMode.AUTO:
+            title += f'\nAuto mode, {results.num_colors_used} colors used'
+        else:
+            title += f'\nManual mode, {results.num_colors_used} colors used'
+        
+        axes[0, 1].set_title(title)
         axes[0, 1].axis('off')
         
         # Color palette with transparency
@@ -703,7 +765,7 @@ class ColorImageVectorizer:
 # Convenience functions
 def vectorize_image(input_path: Union[str, Path],
                    output_path: Union[str, Path],
-                   num_colors: int = 8,
+                   num_colors: Optional[int] = None,
                    style: str = 'colored',
                    preserve_transparency: bool = True,
                    **kwargs) -> ProcessingResults:
@@ -713,7 +775,7 @@ def vectorize_image(input_path: Union[str, Path],
     Args:
         input_path: Path to input image
         output_path: Path to save SVG
-        num_colors: Number of colors
+        num_colors: Number of colors (None for auto mode)
         style: SVG style
         preserve_transparency: Whether to preserve transparency
         **kwargs: Additional parameters
@@ -721,7 +783,49 @@ def vectorize_image(input_path: Union[str, Path],
     Returns:
         Processing results
     """
-    vectorizer = ColorImageVectorizer(preserve_transparency=preserve_transparency, **kwargs)
+    # Check if num_colors is provided to determine mode
+    if num_colors is not None:
+        # Manual mode
+        vectorizer = ColorImageVectorizer(
+            preserve_transparency=preserve_transparency,
+            color_mode=ColorMode.MANUAL,
+            num_colors=num_colors,
+            **kwargs
+        )
+    else:
+        # Auto mode
+        vectorizer = ColorImageVectorizer(
+            preserve_transparency=preserve_transparency,
+            color_mode=ColorMode.AUTO,
+            **kwargs
+        )
+    
     results = vectorizer.process_image(input_path, num_colors=num_colors)
-    vectorizer.create_svg(results, output_path, style=style, preserve_transparency=preserve_transparency, **kwargs)
+    vectorizer.create_svg(results, output_path, style=style, preserve_transparency=preserve_transparency)
     return results
+
+
+def create_vectorizer(auto_mode: bool = True, 
+                     num_colors: Optional[int] = None,
+                     **kwargs) -> ColorImageVectorizer:
+    """
+    Create a vectorizer with specified mode.
+    
+    Args:
+        auto_mode: Whether to use auto mode (True) or manual mode (False)
+        num_colors: Number of colors for manual mode (required if auto_mode=False)
+        **kwargs: Additional parameters
+        
+    Returns:
+        ColorImageVectorizer instance
+    """
+    if auto_mode:
+        return ColorImageVectorizer(color_mode=ColorMode.AUTO, **kwargs)
+    else:
+        if num_colors is None:
+            raise ValueError("num_colors must be provided for manual mode")
+        return ColorImageVectorizer(
+            color_mode=ColorMode.MANUAL,
+            num_colors=num_colors,
+            **kwargs
+        )
