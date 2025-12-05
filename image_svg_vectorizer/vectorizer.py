@@ -721,23 +721,31 @@ class ColorImageVectorizer:
             color_data = colors[i]
             color_bgr = color_data.bgr
             
-            # Create temporary image with transparency
-            temp_img = np.zeros((*results.original_image.shape[:2], 4), dtype=np.uint8)
+            # Create temporary image with 3 channels for drawing contours
+            temp_img_3ch = np.zeros((*results.original_image.shape[:2], 3), dtype=np.uint8)
+            temp_img_alpha = np.zeros(results.original_image.shape[:2], dtype=np.uint8)
             
             # Draw external contours
             for contour in color_data.external_contours:
-                cv2.drawContours(temp_img[:, :, :3], [contour], -1, color_bgr, 2)
-                cv2.drawContours(temp_img[:, :, 3], [contour], -1, 255, 2)
+                cv2.drawContours(temp_img_3ch, [contour], -1, color_bgr, 2)
+                cv2.drawContours(temp_img_alpha, [contour], -1, 255, 2)
             
             # Draw internal contours
             for contour in color_data.internal_contours:
-                cv2.drawContours(temp_img[:, :, :3], [contour], -1, 
+                cv2.drawContours(temp_img_3ch, [contour], -1, 
                                 tuple(int(c * 0.7) for c in color_bgr), 1)
-                cv2.drawContours(temp_img[:, :, 3], [contour], -1, 255, 1)
+                cv2.drawContours(temp_img_alpha, [contour], -1, 255, 1)
             
-            contour_img = cv2.addWeighted(contour_img, 1.0, temp_img, 1.0, 0)
+            # Combine 3-channel image with alpha channel
+            temp_img_4ch = np.zeros((*results.original_image.shape[:2], 4), dtype=np.uint8)
+            temp_img_4ch[:, :, :3] = temp_img_3ch
+            temp_img_4ch[:, :, 3] = temp_img_alpha
+            
+            # Add to final contour image
+            contour_img = cv2.addWeighted(contour_img, 1.0, temp_img_4ch, 1.0, 0)
         
-        axes[1, 1].imshow(np.clip(cv2.cvtColor(contour_img, cv2.COLOR_BGRA2RGBA), 0, 255))
+        # Display contour image
+        axes[1, 1].imshow(cv2.cvtColor(contour_img, cv2.COLOR_BGRA2RGBA))
         axes[1, 1].set_title(f'Contours (first {colors_to_show} colors)')
         axes[1, 1].axis('off')
         
