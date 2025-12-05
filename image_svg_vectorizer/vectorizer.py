@@ -768,6 +768,7 @@ def vectorize_image(input_path: Union[str, Path],
                    num_colors: Optional[int] = None,
                    style: str = 'colored',
                    preserve_transparency: bool = True,
+                   min_contour_area: int = 10,
                    **kwargs) -> ProcessingResults:
     """
     Simplified function for image vectorization.
@@ -778,6 +779,7 @@ def vectorize_image(input_path: Union[str, Path],
         num_colors: Number of colors (None for auto mode)
         style: SVG style
         preserve_transparency: Whether to preserve transparency
+        min_contour_area: Minimum contour area for processing (in pixels)
         **kwargs: Additional parameters
         
     Returns:
@@ -790,6 +792,7 @@ def vectorize_image(input_path: Union[str, Path],
             preserve_transparency=preserve_transparency,
             color_mode=ColorMode.MANUAL,
             num_colors=num_colors,
+            min_contour_area=min_contour_area,
             **kwargs
         )
     else:
@@ -797,6 +800,7 @@ def vectorize_image(input_path: Union[str, Path],
         vectorizer = ColorImageVectorizer(
             preserve_transparency=preserve_transparency,
             color_mode=ColorMode.AUTO,
+            min_contour_area=min_contour_area,
             **kwargs
         )
     
@@ -807,6 +811,7 @@ def vectorize_image(input_path: Union[str, Path],
 
 def create_vectorizer(auto_mode: bool = True, 
                      num_colors: Optional[int] = None,
+                     min_contour_area: int = 10,
                      **kwargs) -> ColorImageVectorizer:
     """
     Create a vectorizer with specified mode.
@@ -814,18 +819,24 @@ def create_vectorizer(auto_mode: bool = True,
     Args:
         auto_mode: Whether to use auto mode (True) or manual mode (False)
         num_colors: Number of colors for manual mode (required if auto_mode=False)
+        min_contour_area: Minimum contour area for processing (in pixels)
         **kwargs: Additional parameters
         
     Returns:
         ColorImageVectorizer instance
     """
     if auto_mode:
-        return ColorImageVectorizer(color_mode=ColorMode.AUTO, **kwargs)
+        return ColorImageVectorizer(
+            color_mode=ColorMode.AUTO,
+            min_contour_area=min_contour_area,
+            **kwargs
+        )
     else:
         if num_colors is None:
             raise ValueError("num_colors must be provided for manual mode")
         return ColorImageVectorizer(
             color_mode=ColorMode.MANUAL,
             num_colors=num_colors,
+            min_contour_area=min_contour_area,
             **kwargs
         )
