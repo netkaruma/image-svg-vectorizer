@@ -37,7 +37,6 @@ results = vectorizer.process_image(
     "input.png",
     num_colors=8,
     method='kmeans',  # or 'median'
-    auto_colors=False
 )
 
 # Create SVG
@@ -107,7 +106,6 @@ process_image(
     image_path: Union[str, Path],
     num_colors: int = 8,
     method: str = 'kmeans',
-    auto_colors: bool = False,
     max_colors: int = 16
 ) -> ProcessingResults
 ```
@@ -119,8 +117,7 @@ process_image(
 3. method (str): Color simplification method:
     'kmeans': K-means clustering (more accurate, slower)
     'median': Median cut quantization (faster, good for images with clear color separation)
-4. auto_colors (bool): Automatically determine optimal number of colors based on image complexity.
-5. max_colors (int): Maximum number of colors when auto_colors=True.
+4. max_colors (int): Maximum number of colors.
 
 ## Returns: ProcessingResults object containing:
 
