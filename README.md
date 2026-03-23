@@ -1,4 +1,4 @@
-# Color Image Vectorizer
+# Color Image Converter png and jpg to svg
 ### A powerful Python tool for converting raster images (PNG, JPG, etc.) into scalable vector graphics (SVG) with optimized color simplification and transparency support.
 ___ 
 <img width="1032" height="602" alt="image" src="https://github.com/user-attachments/assets/7931186f-0e9f-40b6-acf8-fee6b7be0add" />
