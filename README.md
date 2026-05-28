@@ -14,7 +14,7 @@ pip install git+https://github.com/netkaruma/image-svg-vectorizer.git
 ## Basic Usage
 
 ```python
-from color_image_vectorizer import vectorize_image
+from image_svg_vectorizer import vectorize_image
 
 # Single image vectorization
 result = vectorize_image(
@@ -25,7 +25,7 @@ result = vectorize_image(
 )
 
 # Or use the class directly
-from color_image_vectorizer import ColorImageVectorizer
+from image_svg_vectorizer import ColorImageVectorizer
 
 vectorizer = ColorImageVectorizer(
     preserve_transparency=True,
@@ -54,7 +54,7 @@ vectorizer.create_preview(results, "preview.png")
 ## Batch Processing
 
 ```python
-from color_image_vectorizer import batch_vectorize
+from image_svg_vectorizer import batch_vectorize
 
 # Process all images in a directory
 results = batch_vectorize(
@@ -217,7 +217,7 @@ ___
 ### Process multiple images in batch mode.
 
 ```python
-from color_image_vectorizer import BatchProcessor
+from image_svg_vectorizer import BatchProcessor
 
 processor = BatchProcessor(vectorizer=None)  # Optional custom vectorizer
 
