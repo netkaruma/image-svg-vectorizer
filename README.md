@@ -291,3 +291,6 @@ vectorizer = ColorImageVectorizer(
     min_contour_area=20     # Ignore small details
 )
 ```
+
+## LICENSE
+MIT
